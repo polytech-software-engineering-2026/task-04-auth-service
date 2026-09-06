@@ -1,0 +1,4 @@
+# Сработает после апгрейда организации до GitHub Team (нужны required reviewers).
+/contract_tests/            @vladefr97
+/.github/                   @vladefr97
+/pyproject.toml             @vladefr97
