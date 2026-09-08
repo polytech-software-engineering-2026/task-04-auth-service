@@ -1,4 +1,4 @@
-.PHONY: install hooks lint format test check up down
+.PHONY: install hooks lint format test-unit test-integration check up down
 
 install:
 	uv sync
@@ -15,10 +15,22 @@ format:
 	uv run ruff check --fix .
 	uv run ruff format .
 
-test:
-	uv run pytest tests -q
+test-unit:
+	@uv run pytest tests/unit -q; code=$$?; \
+	if [ $$code -eq 5 ]; then echo "Юнит-тестов пока нет — это нормально."; exit 0; fi; \
+	exit $$code
 
-check: lint test
+# Требует поднятого сервиса (make up).
+test-integration:
+	@uv run pytest tests/integration -q; code=$$?; \
+	if [ $$code -eq 5 ]; then echo "Своих интеграционных тестов пока нет — это нормально."; exit 0; fi; \
+	exit $$code
+
+# Требует поднятого сервиса (make up) — обязательные тесты преподавателя.
+test-contract:
+	uv run pytest contract_tests -v
+
+check: lint test-unit
 
 up:
 	docker compose up -d --build

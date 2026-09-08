@@ -35,7 +35,101 @@ jobs:
       - name: mypy
         run: uv run mypy app
 
-  # Джоба, которая поднимает сервис через docker compose и гоняет
-  # contract_tests/ по HTTP, добавляется вместе с самими контрактными
-  # тестами — см. README и docs/tasks. До этого момента "lint" — это
-  # единственная обязательная проверка.
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - run: uv sync --frozen
+
+      - name: pytest tests/unit (ваши юнит-тесты)
+        run: |
+          set +e
+          uv run pytest tests/unit -v
+          code=$?
+          set -e
+          if [ "$code" -eq 5 ]; then
+            echo "Юнит-тестов пока нет — это нормально, если задание ещё не начато."
+            exit 0
+          fi
+          exit "$code"
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Обязательны только register и login — тянутся из шаблона по тегу,
+      # правка своей копии не даёт эффекта. Остальной контракт (refresh,
+      # user/update, user/history, logout, user/me) проверяют tests/integration/,
+      # которые пишете вы, — они тоже гоняются здесь, против того же сервиса.
+      - name: checkout reference contract tests
+        uses: actions/checkout@v7
+        with:
+          repository: polytech-software-engineering-2026/task-04-auth-service
+          ref: reference-v1
+          path: .reference-template
+
+      - name: sync reference contract tests
+        run: |
+          rm -rf contract_tests
+          mv .reference-template/contract_tests contract_tests
+          rm -rf .reference-template
+
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - run: uv sync --frozen
+
+      - name: prepare .env
+        run: test -f .env || cp .env.example .env
+
+      - name: docker compose up
+        run: docker compose up -d --build
+
+      - name: wait for /health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8002/health >/dev/null; then
+              echo "Сервис ответил на /health"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Сервис не поднялся за отведённое время" >&2
+          docker compose logs
+          exit 1
+
+      - name: run mandatory contract tests (register, login)
+        env:
+          AUTH_SERVICE_URL: http://localhost:8002
+        run: uv run pytest contract_tests -v
+
+      - name: run your integration tests (остальной контракт)
+        env:
+          AUTH_SERVICE_URL: http://localhost:8002
+        run: |
+          set +e
+          uv run pytest tests/integration -v
+          code=$?
+          set -e
+          if [ "$code" -eq 5 ]; then
+            echo "Своих интеграционных тестов пока нет — это нормально, если задание ещё не начато."
+            exit 0
+          fi
+          exit "$code"
+
+      - name: docker compose logs
+        if: always()
+        run: docker compose logs
+
+      - name: docker compose down
+        if: always()
+        run: docker compose down -v

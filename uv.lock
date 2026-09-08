@@ -1047,7 +1047,7 @@ wheels = [
 ]
 
 [[package]]
-name = "task-03-auth-service"
+name = "task-04-auth-service"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

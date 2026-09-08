@@ -1,7 +1,7 @@
 [project]
-name = "task-03-auth-service"
+name = "task-04-auth-service"
 version = "0.1.0"
-description = "Задание 3: Auth-сервис"
+description = "Задание 4: Auth-сервис"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115",
@@ -33,7 +33,9 @@ extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
-ignore = []
+# B008: Depends(...) как дефолтный аргумент — официальный паттерн FastAPI,
+# а не баг; без этого ruff ругался бы на каждый эндпоинт.
+ignore = ["B008"]
 
 [tool.ruff.format]
 quote-style = "double"

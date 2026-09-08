@@ -2,10 +2,12 @@
 
 Курс «Программная инженерия», Политех, осень 2026.
 
-> Контрактные тесты преподавателя и docker-compose джоба в CI появятся
-> к неделе 13 — сейчас в этом репозитории только задание, контракт и
-> каркас с проверкой качества кода (`lint`). Реализовывать сервис можно
-> уже сейчас: контракт ниже финальный и меняться не будет.
+Обязательные контрактные тесты преподавателя — на `/register` и
+`/login`, они уже в `contract_tests/` и обязательны в CI. Остальной
+контракт (`/refresh`, `/user/update`, `/user/history`, `/logout`,
+`/user/me`) вы проверяете **своими** интеграционными тестами в
+`tests/integration/` — это часть задания, не бонус. Полезные материалы
+по стеку — в [МАТЕРИАЛЫ.md](МАТЕРИАЛЫ.md).
 
 ## Задание
 
@@ -25,13 +27,15 @@
 - миграции — alembic; слои разделены (api / service / repository);
 - `Dockerfile`, `docker-compose.yml` (сервис на порту **8002** + postgres + redis);
 - README с инструкцией запуска;
-- минимум 5 своих тестов.
+- `tests/unit/` — минимум 5 юнит-тестов;
+- `tests/integration/` — интеграционные тесты на весь контракт, кроме
+  `/register` и `/login` (см. «Что проверяет CI» ниже).
 
 ## Контракт API
 
 | Метод | Путь | Авторизация | Тело запроса | Успех | Ошибки |
 |---|---|---|---|---|---|
-| POST | `/register` | — | `{email, password}` | 201 | 409 email занят; 422 |
+| POST | `/register` | — | `{email, password}` | 201 `{id, email}` | 409 email занят; 422 |
 | POST | `/login` | — | `{email, password}` | 200 `{access_token, refresh_token, token_type}` | 401 |
 | POST | `/refresh` | — | `{refresh_token}` | 200 новая пара токенов | 401 просрочен/отозван/невалиден |
 | PUT | `/user/update` | Bearer | `{email?, password?}` | 200 | 401; 409 email занят |
@@ -41,7 +45,7 @@
 | GET | `/health` | — | — | 200 | — используется CI для ожидания старта |
 
 `GET /user/me` не входит в исходное задание, но обязателен здесь — он
-нужен для бонусной интеграции с Students API и для контрактных тестов.
+нужен для бонусной интеграции с Students API и для ваших же тестов.
 
 ## Установка и запуск
 
@@ -55,20 +59,39 @@ make down        # остановить и удалить volume
 Локальная проверка перед пушем:
 
 ```bash
-make check       # ruff + mypy + ваши тесты из tests/
+make check             # ruff + mypy + tests/unit
+make test-integration  # требует make up — ваши тесты на остальной контракт
+make test-contract     # требует make up — обязательные тесты преподавателя (register, login)
 ```
 
 ## Структура
 
 ```
 app/                  # ваш код: api / service / repository
-contract_tests/       # тесты преподавателя (появятся к неделе 13)
-tests/                # ваши тесты
+contract_tests/       # тесты преподавателя (register, login) — не редактировать
+tests/unit/            # ваши юнит-тесты
+tests/integration/     # ваши интеграционные тесты на остальной контракт
 alembic/               # миграции (создаёте вы)
 docker-compose.yml     # сервис (порт 8002) + postgres + redis
 Dockerfile
 .env.example
 ```
+
+## Что проверяет CI
+
+Три обязательные проверки:
+
+- **`lint`** — ruff + mypy;
+- **`unit-tests`** — `tests/unit/`;
+- **`integration`** — поднимает сервис через `docker compose up -d --build`,
+  дожидается `/health`, гоняет **обязательные** `contract_tests/`
+  (register, login — тянутся из этого репозитория по тегу `reference-v1`,
+  редактировать бессмысленно), затем **ваши** `tests/integration/` на
+  оставшийся контракт.
+
+Если что-то из `tests/integration/` ещё не написано — джоба не падает
+(как и с `tests/unit/`), но раз файлы там появятся, они обязаны
+проходить, иначе `integration` красный.
 
 ## Как сдавать
 
