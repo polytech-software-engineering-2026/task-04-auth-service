@@ -91,6 +91,13 @@ jobs:
       - name: prepare .env
         run: test -f .env || cp .env.example .env
 
+      - name: check docker-compose.yml exists
+        run: |
+          if [ ! -f docker-compose.yml ]; then
+            echo "docker-compose.yml ещё не создан — задание не начато (см. README, раздел про Docker Compose)." >&2
+            exit 1
+          fi
+
       - name: docker compose up
         run: docker compose up -d --build
 
@@ -128,8 +135,8 @@ jobs:
 
       - name: docker compose logs
         if: always()
-        run: docker compose logs
+        run: test -f docker-compose.yml && docker compose logs || true
 
       - name: docker compose down
         if: always()
-        run: docker compose down -v
+        run: test -f docker-compose.yml && docker compose down -v || true
